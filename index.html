@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dead Satellite Reach</title>
+<meta name="description" content="Pick where a salvage station sits in orbit and how much fuel each trip can spend. See which dead satellites it could reach, and who owns them.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f5f4ef; --surface: #fbfaf7; --surface-alt: #eceae3; --border: #d6d3c8;
+  --ink: #1a1d24; --ink-muted: #565a63; --ink-dim: #6d7078;
+  --accent: #c2410c; --dot-out: #84878f; --grid: #e4e1d7;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s6: 24px; --s8: 32px; --s12: 48px;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --t-sm: 14px; --t-md: 16px; --t-lg: 20px; --t-xl: 28px; --t-hero: 64px;
+  --quick: 150ms ease;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #12141a; --surface: #191c23; --surface-alt: #22262f; --border: #343945;
+    --ink: #e5e7eb; --ink-muted: #aeb2bb; --ink-dim: #9296a0;
+    --accent: #e56a2e; --dot-out: #7c818c; --grid: #272b34;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 var(--t-md)/1.5 var(--sans); }
+a { color: inherit; text-underline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+.page { max-width: 1120px; margin: 0 auto; padding: var(--s12) var(--s4); }
+header { max-width: 720px; margin-bottom: var(--s8); }
+h1 { font-size: var(--t-xl); line-height: 1.15; letter-spacing: -0.5px; font-weight: 600; margin: 0 0 var(--s3); }
+h2 { font-size: var(--t-md); line-height: 1.3; font-weight: 600; margin: 0 0 var(--s1); }
+p { margin: 0 0 var(--s3); }
+.muted { color: var(--ink-muted); }
+.small { font-size: var(--t-sm); }
+
+.layout { display: grid; gap: var(--s6); grid-template-columns: 296px minmax(0, 1fr); align-items: start; }
+@media (max-width: 860px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--s1); padding: var(--s4); }
+
+#controls { position: sticky; top: var(--s4); display: grid; gap: var(--s6); }
+@media (max-width: 860px) { #controls { position: static; } }
+.field { display: grid; gap: var(--s1); border: 0; padding: 0; margin: 0; min-width: 0; }
+.field-top { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s2); }
+.field label, .field legend { font-weight: 600; font-size: var(--t-sm); padding: 0; }
+.field output { font: 500 var(--t-sm)/1.4 var(--mono); white-space: nowrap; }
+.field .hint { font-size: var(--t-sm); line-height: 1.4; color: var(--ink-muted); margin: 0; }
+input[type=range] { width: 100%; height: 24px; margin: 0; accent-color: var(--accent); }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s1); margin-top: var(--s1); }
+.seg label { display: block; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.seg span { display: block; padding: var(--s2) 0; text-align: center; border: 1px solid var(--border); border-radius: var(--s1); font: 400 var(--t-sm)/1.4 var(--mono); transition: background var(--quick); }
+.seg span:hover { background: var(--surface-alt); }
+.seg input:checked + span { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.results-col { min-width: 0; }
+#results { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); min-width: 0; }
+.hero-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s1) var(--s3); margin-bottom: var(--s1); }
+.hero-n { font: 500 var(--t-hero)/1 var(--mono); letter-spacing: -2px; color: var(--accent); }
+.hero-label { font-size: var(--t-lg); line-height: 1.3; font-weight: 600; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s4); border-top: 1px solid var(--border); margin-top: var(--s4); padding-top: var(--s3); }
+.stats dt { font-size: var(--t-sm); line-height: 1.3; color: var(--ink-muted); }
+.stats dd { margin: var(--s1) 0 0; font: 500 var(--t-lg)/1.2 var(--mono); }
+
+#map { position: relative; margin-top: var(--s3); touch-action: pan-y; }
+#map svg { display: block; width: 100%; }
+#map text { font: 400 12px var(--mono); fill: var(--ink-dim); }
+#map .station-label { fill: var(--ink); font-weight: 500; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.legend { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s4); font-size: var(--t-sm); color: var(--ink-muted); margin-top: var(--s2); }
+.legend span { display: inline-flex; align-items: center; gap: var(--s2); }
+.key { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.key.in { background: var(--accent); }
+.key.out { border: 1.5px solid var(--dot-out); }
+#tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); padding: var(--s2) var(--s3); border-radius: var(--s1); font-size: var(--t-sm); line-height: 1.4; max-width: 240px; z-index: 2; }
+#tip strong { display: block; }
+
+.bars { display: grid; gap: var(--s2); margin-top: var(--s3); }
+.bar-row { display: grid; grid-template-columns: minmax(0, 11em) minmax(0, 1fr) 3ch; gap: var(--s2); align-items: center; font-size: var(--t-sm); }
+.bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { height: 8px; }
+.bar-fill { height: 100%; min-width: 2px; background: var(--accent); border-radius: 0 var(--s1) var(--s1) 0; }
+.bar-count { font-family: var(--mono); text-align: right; }
+
+.table-wrap { overflow: auto; max-height: 520px; margin-top: var(--s3); border-top: 1px solid var(--border); }
+table { border-collapse: collapse; width: 100%; font-size: var(--t-sm); }
+th, td { padding: var(--s2) var(--s3) var(--s2) 0; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--grid); }
+td.num, th.num { text-align: right; font-family: var(--mono); }
+thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; font-weight: 600; }
+th button { all: unset; cursor: pointer; display: inline-block; padding: var(--s1) 0; }
+th button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+th[aria-sort] button { color: var(--accent); }
+th[aria-sort=ascending] button::after { content: " \2191"; }
+th[aria-sort=descending] button::after { content: " \2193"; }
+
+#status[hidden], #results[hidden], [hidden] { display: none !important; }
+#status { padding: var(--s6) var(--s4); }
+#status.error { border-color: var(--accent); }
+.limits { margin: var(--s2) 0 0; padding-left: var(--s4); font-size: var(--t-sm); color: var(--ink-muted); }
+.limits li { margin-bottom: var(--s1); }
+footer { margin-top: var(--s8); padding-top: var(--s4); border-top: 1px solid var(--border); font-size: var(--t-sm); color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>Which dead satellites could one station reach?</h1>
+    <p>We're testing an idea: a station in orbit that clears dead satellites for their owners and reuses what still works. The first question is which ones it could even get to. Change the settings to find out.</p>
+    <p class="muted small">An estimate from public catalog data. The station doesn't exist, and no owner has agreed to anything.</p>
+  </header>
+
+  <div class="layout">
+    <form id="controls" class="panel" autocomplete="off">
+      <div class="field">
+        <div class="field-top"><label for="alt">Station altitude</label><output id="alt-out" for="alt"></output></div>
+        <input id="alt" type="range" min="500" max="1200" step="50" value="700">
+        <p class="hint" id="alt-hint"></p>
+      </div>
+      <div class="field">
+        <div class="field-top"><label for="node">Orbit plane</label><output id="node-out" for="node"></output></div>
+        <input id="node" type="range" min="0" max="23.5" step="0.5" value="18">
+        <p class="hint" id="node-hint"></p>
+      </div>
+      <div class="field">
+        <div class="field-top"><label for="fuel">Fuel per trip</label><output id="fuel-out" for="fuel"></output></div>
+        <input id="fuel" type="range" min="100" max="1500" step="50" value="500">
+        <p class="hint">The speed change a tug can make going one way. More means bigger, costlier trips.</p>
+      </div>
+      <fieldset class="field">
+        <legend>How long it can wait</legend>
+        <div class="seg">
+          <label><input type="radio" name="wait" value="0"><span>Now</span></label>
+          <label><input type="radio" name="wait" value="1"><span>1 yr</span></label>
+          <label><input type="radio" name="wait" value="5" checked><span>5 yr</span></label>
+          <label><input type="radio" name="wait" value="10"><span>10 yr</span></label>
+        </div>
+        <p class="hint" style="margin-top: var(--s2)">Orbit planes drift slowly, so waiting for one to pass costs far less fuel than chasing it.</p>
+      </fieldset>
+    </form>
+
+    <div class="results-col">
+      <div id="status" class="panel" role="status">Loading the satellite catalog…</div>
+      <div id="results" hidden>
+        <section class="panel" aria-live="polite">
+          <div class="hero-line"><span class="hero-n" id="hero-n"></span><span class="hero-label" id="hero-label"></span></div>
+          <p class="muted" id="hero-sub" style="margin:0"></p>
+          <dl class="stats">
+            <div><dt>In reach today</dt><dd id="stat-today"></dd></div>
+            <div><dt>New chances a year</dt><dd id="stat-rate"></dd></div>
+            <div><dt>Owners to ask</dt><dd id="stat-owners"></dd></div>
+          </dl>
+        </section>
+
+        <section class="panel">
+          <h2>Where they are now</h2>
+          <p class="muted small" style="margin:0">Each dot is a dead satellite. Dots far from the station can still be in reach, because their planes drift past it over the wait you picked.</p>
+          <div id="map"><div id="tip" hidden></div></div>
+          <div class="legend"><span><i class="key in"></i>In reach</span><span><i class="key out"></i>Out of reach</span></div>
+        </section>
+
+        <section class="panel" id="owners-panel">
+          <h2>Who you'd have to ask</h2>
+          <p class="muted small" style="margin:0">The catalog gives a country or agency, not a company. Dead satellites stay under the state that registered them (<a href="https://www.nasa.gov/history/SP-4225/documentation/cooperation/treaty.htm">Outer Space Treaty, Article VIII</a>), so each one needs consent.</p>
+          <div class="bars" id="bars"></div>
+        </section>
+
+        <section class="panel" id="table-panel">
+          <h2>The satellites in reach</h2>
+          <p class="muted small" style="margin:0">Fuel is the cheapest one-way trip inside your wait. Radar size is the catalog's cross-section, a rough guide to physical size.</p>
+          <div class="table-wrap" tabindex="0" role="region" aria-label="Satellites in reach">
+            <table>
+              <thead><tr id="thead"></tr></thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>What this leaves out</h2>
+          <ul class="limits">
+            <li id="limit-data"></li>
+            <li>The fuel figure combines plane and altitude change for one direction only. It ignores the trip back, lining up inside the orbit, and catching a tumbling object.</li>
+            <li>Drift is modelled at constant rates. This is a desk estimate, not a mission design, and no spacecraft engineer has checked it yet.</li>
+            <li>"Dead" is one compiler's status code. Confirm each satellite with its owner.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p id="footer-data" style="margin:0 0 var(--s1)"></p>
+    <p style="margin:0"><a href="https://github.com/Berryderi/dead-satellite-reach">Source code and method</a></p>
+  </footer>
+</div>
+
+<script type="module">
+import { reachable, stationAt, nodeLocalTime, DAYS_PER_YEAR } from "./reach.js";
+
+const OWNER_NAMES = {
+  US: "United States", FR: "France", TBD: "Not stated", JPN: "Japan", IND: "India", GER: "Germany",
+  CIS: "CIS (former USSR)", UK: "United Kingdom", PRC: "China", ESA: "European Space Agency", SKOR: "South Korea",
+  DEN: "Denmark", UKR: "Ukraine", NOR: "Norway", IT: "Italy", CA: "Canada", ARGN: "Argentina", SING: "Singapore",
+  AUS: "Australia", CHBZ: "China/Brazil", SWED: "Sweden", PAKI: "Pakistan", ROC: "Taiwan", SPN: "Spain", BRAZ: "Brazil",
+  ORB: "ORBCOMM", THAI: "Thailand", SAFR: "South Africa", EUME: "EUMETSAT", EGYP: "Egypt", COL: "Colombia",
+  ASRA: "Austria", TURK: "Türkiye", EST: "Estonia", NETH: "Netherlands", POL: "Poland", PERU: "Peru", URY: "Uruguay",
+  ALG: "Algeria", ISRA: "Israel",
+};
+const ownerName = (code) => OWNER_NAMES[code] ?? code;
+const MAX_OWNER_BARS = 8;
+const DAYS_PER_MONTH = 30;
+const PICK_RADIUS_PX = 24;
+const DOT_RADIUS_PX = 4;
+const MAP_ASPECT = 0.52;
+const MAP_MIN_HEIGHT = 280;
+const MARGIN = { top: 28, right: 12, bottom: 48, left: 48 };
+const SVG_NS = "http://www.w3.org/2000/svg";
+const $ = (id) => document.getElementById(id);
+
+const COLUMNS = [
+  { key: "name", label: "Satellite", value: (s) => s.name },
+  { key: "owner", label: "Owner", value: (s) => ownerName(s.owner) },
+  { key: "launch", label: "Launched", num: true, value: (s) => s.launch },
+  { key: "h", label: "Altitude km", num: true, value: (s) => s.h, text: (s) => Math.round(s.h) },
+  { key: "i", label: "Incl. °", num: true, value: (s) => s.i, text: (s) => s.i.toFixed(1) },
+  { key: "rcs", label: "Radar size m²", num: true, value: (s) => s.rcs ?? -1, text: (s) => (s.rcs === null ? "n/a" : s.rcs.toFixed(1)) },
+  { key: "bestMS", label: "Fuel m/s", num: true, value: (s) => s.bestMS, text: (s) => Math.round(s.bestMS) },
+  { key: "firstDay", label: "First chance", num: true, value: (s) => s.firstDay, text: (s) => firstChance(s.firstDay) },
+];
+
+let catalog = null;
+let sort = { key: "firstDay", dir: 1 };
+let latest = [];
+let mapPoints = [];
+let frame = 0;
+
+function firstChance(day) {
+  if (day === 0) return "Today";
+  if (day < DAYS_PER_YEAR) return `${Math.max(1, Math.round(day / DAYS_PER_MONTH))} mo`;
+  return `${(day / DAYS_PER_YEAR).toFixed(1)} yr`;
+}
+
+function clockText(hours) {
+  const h = Math.floor(hours);
+  const m = hours % 1 ? "30" : "00";
+  return `${h % 12 || 12}:${m} ${h < 12 ? "am" : "pm"}`;
+}
+
+function settings() {
+  return {
+    h: Number($("alt").value),
+    node: Number($("node").value),
+    fuel: Number($("fuel").value),
+    years: Number(document.querySelector("input[name=wait]:checked").value),
+  };
+}
+
+function svg(tag, attrs, parent, text) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  if (text !== undefined) el.textContent = text;
+  parent.append(el);
+  return el;
+}
+
+function renderMap(station, nodeHours, inReach) {
+  const box = $("map");
+  box.querySelector("svg")?.remove();
+  const width = box.clientWidth;
+  if (!width) return;
+  const height = Math.max(MAP_MIN_HEIGHT, Math.round(width * MAP_ASPECT));
+  const plotW = width - MARGIN.left - MARGIN.right;
+  const plotH = height - MARGIN.top - MARGIN.bottom;
+  const maxAlt = Math.ceil(Math.max(...catalog.sats.map((s) => s.h)) / 100) * 100;
+  const minAlt = 400;
+  const x = (hours) => MARGIN.left + (hours / 24) * plotW;
+  const y = (alt) => MARGIN.top + (1 - (alt - minAlt) / (maxAlt - minAlt)) * plotH;
+
+  const root = svg("svg", { width, height, viewBox: `0 0 ${width} ${height}`, role: "img",
+    "aria-label": `Dead satellites by orbit plane and altitude. ${inReach.size} of ${catalog.sats.length} are in reach. The table below lists them.` }, box);
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name);
+
+  const altStep = maxAlt - minAlt > 1000 ? 400 : 200;
+  for (let alt = minAlt; alt <= maxAlt; alt += altStep) {
+    svg("line", { x1: MARGIN.left, x2: width - MARGIN.right, y1: y(alt), y2: y(alt), stroke: css("--grid") }, root);
+    svg("text", { x: MARGIN.left - 8, y: y(alt) + 4, "text-anchor": "end" }, root, alt);
+  }
+  svg("text", { x: 0, y: 12 }, root, "Altitude, km");
+  svg("text", { x: MARGIN.left + plotW / 2, y: height - 4, "text-anchor": "middle" }, root, "Local time the orbit crosses the equator");
+  const hourStep = width < 480 ? 12 : 6;
+  for (let hour = 0; hour <= 24; hour += hourStep) {
+    svg("line", { x1: x(hour), x2: x(hour), y1: MARGIN.top, y2: height - MARGIN.bottom, stroke: css("--grid") }, root);
+    const anchor = hour === 0 ? "start" : hour === 24 ? "end" : "middle";
+    svg("text", { x: x(hour), y: height - MARGIN.bottom + 16, "text-anchor": anchor }, root, hour % 24 === 0 ? "midnight" : hour === 12 ? "noon" : clockText(hour));
+  }
+
+  mapPoints = catalog.sats.map((s) => ({
+    sat: s, px: x(nodeLocalTime(s.raan, catalog.meta.sunRa)), py: y(s.h), reach: inReach.get(s.id),
+  }));
+  // Draw in-reach dots last so they sit on top.
+  for (const p of mapPoints.filter((q) => !q.reach)) {
+    svg("circle", { cx: p.px, cy: p.py, r: DOT_RADIUS_PX - 0.75, fill: "none", stroke: css("--dot-out"), "stroke-width": 1.5 }, root);
+  }
+  for (const p of mapPoints.filter((q) => q.reach)) {
+    svg("circle", { cx: p.px, cy: p.py, r: DOT_RADIUS_PX, fill: css("--accent"), stroke: css("--surface"), "stroke-width": 1.5 }, root);
+  }
+
+  const sx = x(nodeHours), sy = y(station.h);
+  svg("line", { x1: sx, x2: sx, y1: MARGIN.top, y2: height - MARGIN.bottom, stroke: css("--ink"), "stroke-dasharray": "2 3" }, root);
+  svg("line", { x1: MARGIN.left, x2: width - MARGIN.right, y1: sy, y2: sy, stroke: css("--ink"), "stroke-dasharray": "2 3" }, root);
+  svg("rect", { x: sx - 6, y: sy - 6, width: 12, height: 12, fill: css("--ink"), stroke: css("--surface"), "stroke-width": 2 }, root);
+  const labelLeft = sx > width - 90;
+  svg("text", { x: sx + (labelLeft ? -12 : 12), y: sy - 8, "text-anchor": labelLeft ? "end" : "start", class: "station-label" }, root, "Station");
+}
+
+function showTip(event) {
+  const box = $("map");
+  const bounds = box.getBoundingClientRect();
+  const mx = event.clientX - bounds.left, my = event.clientY - bounds.top;
+  let best = null, bestDist = PICK_RADIUS_PX;
+  for (const p of mapPoints) {
+    const d = Math.hypot(p.px - mx, p.py - my);
+    if (d < bestDist) { best = p; bestDist = d; }
+  }
+  const tip = $("tip");
+  if (!best) { tip.hidden = true; return; }
+  const title = document.createElement("strong");
+  title.textContent = best.sat.name;
+  const detail = document.createElement("span");
+  const reachText = best.reach ? `In reach, first chance: ${firstChance(best.reach.firstDay).toLowerCase()}` : "Out of reach";
+  detail.textContent = `${ownerName(best.sat.owner)}, launched ${best.sat.launch}, ${Math.round(best.sat.h)} km. ${reachText}.`;
+  tip.replaceChildren(title, detail);
+  tip.hidden = false;
+  const left = Math.min(best.px + 12, bounds.width - tip.offsetWidth);
+  const top = best.py > tip.offsetHeight + 12 ? best.py - tip.offsetHeight - 8 : best.py + 12;
+  tip.style.left = `${Math.max(0, left)}px`;
+  tip.style.top = `${top}px`;
+}
+
+function renderBars(list) {
+  const counts = new Map();
+  for (const s of list) counts.set(s.owner, (counts.get(s.owner) ?? 0) + 1);
+  const ranked = [...counts].sort((a, b) => b[1] - a[1] || ownerName(a[0]).localeCompare(ownerName(b[0])));
+  const shown = ranked.slice(0, MAX_OWNER_BARS).map(([code, n]) => [ownerName(code), n]);
+  const rest = ranked.slice(MAX_OWNER_BARS);
+  if (rest.length) shown.push([`${rest.length} others`, rest.reduce((sum, [, n]) => sum + n, 0)]);
+  const max = Math.max(1, ...shown.map(([, n]) => n));
+  $("bars").replaceChildren(...shown.map(([name, n]) => {
+    const row = document.createElement("div"); row.className = "bar-row";
+    const label = document.createElement("span"); label.className = "bar-name"; label.textContent = name; label.title = name;
+    const track = document.createElement("span"); track.className = "bar-track";
+    const fill = document.createElement("span"); fill.className = "bar-fill"; fill.style.display = "block"; fill.style.width = `${(n / max) * 100}%`;
+    track.append(fill);
+    const count = document.createElement("span"); count.className = "bar-count"; count.textContent = n;
+    row.append(label, track, count);
+    return row;
+  }));
+  return counts.size;
+}
+
+function renderHead() {
+  $("thead").replaceChildren(...COLUMNS.map((col) => {
+    const th = document.createElement("th");
+    th.scope = "col";
+    if (col.num) th.className = "num";
+    if (col.key === sort.key) th.setAttribute("aria-sort", sort.dir > 0 ? "ascending" : "descending");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = col.label;
+    button.addEventListener("click", () => {
+      sort = col.key === sort.key ? { key: col.key, dir: -sort.dir } : { key: col.key, dir: 1 };
+      renderHead();
+      renderTable();
+      $("thead").querySelector("[aria-sort] button").focus();
+    });
+    th.append(button);
+    return th;
+  }));
+}
+
+function renderTable() {
+  const col = COLUMNS.find((c) => c.key === sort.key);
+  const rows = [...latest].sort((a, b) => {
+    const va = col.value(a), vb = col.value(b);
+    return (typeof va === "string" ? va.localeCompare(vb) : va - vb) * sort.dir;
+  });
+  $("tbody").replaceChildren(...rows.map((s) => {
+    const tr = document.createElement("tr");
+    for (const c of COLUMNS) {
+      const td = document.createElement("td");
+      if (c.num) td.className = "num";
+      td.textContent = c.text ? c.text(s) : c.value(s);
+      tr.append(td);
+    }
+    return tr;
+  }));
+}
+
+function render() {
+  if (!catalog) return;
+  const { h, node, fuel, years } = settings();
+  const station = stationAt(h, node, catalog.meta.sunRa);
+  latest = reachable(catalog.sats, station, fuel, years);
+  const inReach = new Map(latest.map((s) => [s.id, s]));
+  const todayCount = latest.filter((s) => s.firstDay === 0).length;
+
+  $("alt-out").textContent = `${h} km`;
+  $("alt-hint").textContent = `Sun-synchronous, tilted ${station.i.toFixed(1)}°, so it keeps the same angle to the Sun.`;
+  $("node-out").textContent = clockText(node);
+  $("node-hint").textContent = node === 18 || node === 6
+    ? "Local time it crosses the equator heading north. This dawn-dusk plane stays in sunlight, and some orbital data centers plan to use it."
+    : "Local time it crosses the equator heading north.";
+  $("fuel-out").textContent = `${fuel} m/s`;
+
+  const empty = latest.length === 0;
+  $("hero-n").textContent = latest.length;
+  $("hero-label").textContent = latest.length === 1 ? "dead satellite in reach" : "dead satellites in reach";
+  const when = years === 0 ? "right now" : `within ${years} ${years === 1 ? "year" : "years"}`;
+  $("hero-sub").textContent = empty
+    ? "Nothing in reach with these settings. Try more fuel or a longer wait."
+    : `${when[0].toUpperCase()}${when.slice(1)}, spending up to ${fuel} m/s on each one-way trip, out of ${catalog.sats.length} in the catalog set.`;
+  $("stat-today").textContent = todayCount;
+  $("stat-rate").textContent = years === 0 ? "n/a" : Math.round((latest.length - todayCount) / years);
+  $("stat-owners").textContent = renderBars(latest);
+  $("owners-panel").hidden = empty;
+  $("table-panel").hidden = empty;
+
+  $("tip").hidden = true;
+  renderMap(station, node, inReach);
+  renderTable();
+}
+
+function schedule() {
+  cancelAnimationFrame(frame);
+  frame = requestAnimationFrame(render);
+}
+
+async function start() {
+  try {
+    const response = await fetch("./data/satellites.json");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    catalog = await response.json();
+  } catch (error) {
+    console.error("catalog load failed", error);
+    const status = $("status");
+    status.textContent = "The satellite catalog didn't load. Check your connection and reload the page.";
+    status.classList.add("error");
+    status.setAttribute("role", "alert");
+    return;
+  }
+  const { meta } = catalog;
+  $("limit-data").textContent = `Covers ${meta.count} satellites on ${meta.date}: payloads CelesTrak marks non-operational, on near-circular orbits tilted 90 to 105°, above 400 km and below 2,000 km. Satellites with no status, or on other orbits, aren't counted. ${meta.excludedEccentric} left out for oval orbits and 1 for missing orbit data.`;
+  $("footer-data").textContent = `Data: CelesTrak (Dr. T.S. Kelso), catalog and orbital elements, ${meta.date}.`;
+  $("status").hidden = true;
+  $("results").hidden = false;
+  renderHead();
+  render();
+  new ResizeObserver(schedule).observe($("map"));
+}
+
+$("controls").addEventListener("input", schedule);
+$("controls").addEventListener("submit", (event) => event.preventDefault());
+$("map").addEventListener("pointermove", showTip);
+$("map").addEventListener("pointerdown", showTip);
+$("map").addEventListener("pointerleave", () => { $("tip").hidden = true; });
+start();
+</script>
+</body>
+</html>
