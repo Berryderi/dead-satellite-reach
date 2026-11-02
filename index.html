@@ -459,7 +459,7 @@ async function start() {
   }
   const { meta } = catalog;
   $("limit-data").textContent = `Covers ${meta.count} satellites on ${meta.date}: payloads CelesTrak marks non-operational, on near-circular orbits tilted 90 to 105°, above 400 km and below 2,000 km. Satellites with no status, or on other orbits, aren't counted. ${meta.excludedEccentric} left out for oval orbits and 1 for missing orbit data.`;
-  $("footer-data").textContent = `Data: CelesTrak (Dr. T.S. Kelso), catalog and orbital elements, ${meta.date}.`;
+  $("footer-data").textContent = `Data: USSPACECOM via Space-Track.org and CelesTrak (Dr. T.S. Kelso), catalog and orbital elements, ${meta.date}. Analysis is ours.`;
   $("status").hidden = true;
   $("results").hidden = false;
   renderHead();

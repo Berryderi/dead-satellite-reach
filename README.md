@@ -27,4 +27,4 @@ python3 scripts/build_data.py raw/gp.jsonl data/satellites.json YYYY-MM-DD
 Refreshing changes the counts, so regenerate `test/golden.json` too.
 
 ## Credit
-Satellite data from [CelesTrak](https://celestrak.org) (Dr. T.S. Kelso). Built with Claude Code.
+Satellite data originates from USSPACECOM via [Space-Track.org](https://www.space-track.org), retrieved through [CelesTrak](https://celestrak.org) (Dr. T.S. Kelso). The analysis is ours, not theirs. Built with Claude Code.
